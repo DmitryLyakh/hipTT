@@ -1,0 +1,8 @@
+bin
+bin/*
+build
+build/*
+lib
+lib/*
+include
+include/*
