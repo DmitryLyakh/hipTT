@@ -809,7 +809,6 @@ void prepmodel5(hipDeviceProp_t& prop, GpuModelProp& gpuModelProp,
   // GPU clock in GHz
   double freq = (double)prop.clockRate/1.0e6;
   int warpSize = prop.warpSize;
-  std::cout << warpSize << std::endl;
   return;
 
   int active_warps_per_SM = nthread*numActiveBlock/warpSize;
@@ -847,7 +846,8 @@ double cyclesPacked(const bool isSplit, const size_t sizeofType, hipDeviceProp_t
   int gld_req, int gst_req, int gld_tran, int gst_tran,
   int sld_req, int sst_req, int sld_tran, int sst_tran, int num_iter, int cl_full, int cl_part) {
 
-  int warps_per_block = nthread/32;
+  int warpSize = prop.warpSize;
+  int warps_per_block = nthread/warpSize;
 
   GpuModelProp gpuModelProp(prop.major);
 
@@ -868,7 +868,8 @@ double cyclesTiled(const bool isCopy, const size_t sizeofType, hipDeviceProp_t& 
   int gld_req, int gst_req, int gld_tran, int gst_tran,
   int sld_req, int sst_req, int sld_tran, int sst_tran, int num_iter, int cl_full, int cl_part) {
 
-  int warps_per_block = nthread/32;
+  int warpSize = prop.warpSize;
+  int warps_per_block = nthread/warpSize;
 
   GpuModelProp gpuModelProp(prop.major);
 
@@ -904,6 +905,8 @@ void print_pos(const char* name, const int n, const int* pos) {
 bool testCounters(const int warpSize, const int accWidth, const int cacheWidth) {
 
   if (warpSize != 32) return false;
+
+  std::cout << "In testCounters" << std::endl;
 
   const int numArray = 10;
 

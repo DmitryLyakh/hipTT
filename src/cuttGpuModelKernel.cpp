@@ -84,7 +84,7 @@ int countGlTransactions(const int pos, const int n, const int accWidth, const in
   int seg0 = pos/accWidth;
   int srcLane = (warpLane == 0 || warpLane >= n) ? (warpLane) : (warpLane - 1);
   int seg1 = __shfl(seg0,srcLane);
-  int count = __popc(__ballot(seg0 != seg1)) + 1;
+  int count = __popcll((unsigned long long int)__ballot(seg0 != seg1)) + 1;
   count = (n == 0) ? 0 : count;
   return count;
 }
@@ -191,7 +191,7 @@ __global__ void runCountersKernel(const int* posData, const int numPosData,
     int pos = posData[i];
     int flag = (pos == -1);
     //    int ffsval = __ffs(__ballot(flag)) - 1;
-    int ffsval = __ffs((int)__ballot(flag)) - 1;
+    int ffsval = __ffsll((unsigned long long int)__ballot(flag)) - 1;
     int n = (__any(flag)) ? ffsval : warpSize;
     int tran = countGlTransactions(pos, n, accWidth, warpLane);
     int cl_full = 0;
@@ -216,7 +216,7 @@ __global__ void runCountersKernel(const int* posData, const int numPosData,
 //
 __device__ __forceinline__
 void writeMemStat(const int warpLane, MemStat memStat, MemStat* RESTRICT glMemStat) {
-  for (int i=16;i >= 1;i/=2) {
+  for (int i=32;i >= 1;i/=2) {
     // memStat.gld_tran += __shfl_xor(memStat.gld_tran,i);
     // memStat.gst_tran += __shfl_xor(memStat.gst_tran,i);
     // memStat.gld_req  += __shfl_xor(memStat.gld_req,i);
@@ -274,8 +274,8 @@ countTiled(
   const int xout = bx + threadIdx.y;
   const int yout = by + threadIdx.x;
 
-  const unsigned int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
-  const unsigned int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
+  const unsigned long long int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
+  const unsigned long long int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
 
   const int posMinorIn = xin + yin*cuDimMk;
   const int posMinorOut = yout + xout*cuDimMm;
@@ -292,7 +292,7 @@ countTiled(
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -302,7 +302,7 @@ countTiled(
     // Read data into shared memory tile
 #pragma unroll
     for (int j=0;j < TILEDIM;j += TILEROWS) {
-      int n = __popc(__ballot(maskIny & (1 << j)));
+      int n = __popc((unsigned long long int)__ballot(maskIny & (1 << j)));
       memStat.gld_tran += countGlTransactions(posIn, n, accWidth, warpLane);
       memStat.gld_req += __any(n > 0);
       posIn += posInAdd;
@@ -310,7 +310,7 @@ countTiled(
 
 #pragma unroll
     for (int j=0;j < TILEDIM;j += TILEROWS) {
-      int n = __popc(__ballot(maskOutx & (1 << j)));
+      int n = __popcll((unsigned long long int)__ballot(maskOutx & (1 << j)));
       memStat.gst_tran += countGlTransactions(posOut, n, accWidth, warpLane);
       memStat.gst_req += __any(n > 0);
       countCacheLines(posOut, n, cacheWidth, warpLane, memStat.cl_full_l2, memStat.cl_part_l2);
@@ -387,13 +387,13 @@ countPacked(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -402,7 +402,7 @@ countPacked(
     for (int j=0;j < numRegStorage;j++) {
       int posMmk = threadIdx.x + j*blockDim.x;
       int posIn = posMbarIn + posMmkIn[j];
-      int n = __popc(__ballot(posMmk < volMmk));
+      int n = __popcll((unsigned long long int)__ballot(posMmk < volMmk));
       memStat.gld_tran += countGlTransactions(posIn, n, accWidth, warpLane);
       memStat.gld_req += __any(n > 0);
     }
@@ -412,7 +412,7 @@ countPacked(
     for (int j=0;j < numRegStorage;j++) {
       int posMmk = threadIdx.x + j*blockDim.x;
       int posOut = posMbarOut + posMmkOut[j];
-      int n = __popc(__ballot(posMmk < volMmk));
+      int n = __popcll((unsigned long long int)__ballot(posMmk < volMmk));
       memStat.gst_tran += countGlTransactions(posOut, n, accWidth, warpLane);
       memStat.gst_req += __any(n > 0);
       if (posMmk < volMmk) shSegOut[posMmk] = posOut/cacheWidth;
@@ -521,13 +521,13 @@ countPackedSplit(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -536,7 +536,7 @@ countPackedSplit(
     for (int j=0;j < numRegStorage;j++) {
       int posMmk = threadIdx.x + j*blockDim.x;
       int posIn = posMbarIn + posMmkIn[j];
-      int n = __popc(__ballot(posMmk < volMmkSplit));
+      int n = __popcll((unsigned long long int)__ballot(posMmk < volMmkSplit));
       memStat.gld_tran += countGlTransactions(posIn, n, accWidth, warpLane);
       memStat.gld_req += __any(n > 0);
     }
@@ -546,7 +546,7 @@ countPackedSplit(
     for (int j=0;j < numRegStorage;j++) {
       int posMmk = threadIdx.x + j*blockDim.x;
       int posOut = posMbarOut + posMmkOut[j];
-      int n = __popc(__ballot(posMmk < volMmkSplit));
+      int n = __popcll((unsigned long long int)__ballot(posMmk < volMmkSplit));
       memStat.gst_tran += countGlTransactions(posOut, n, accWidth, warpLane);
       memStat.gst_req += __any(n > 0);
       if (posMmk < volMmkSplit) shSegOut[posMmk] = posOut / cacheWidth;
@@ -620,7 +620,7 @@ countTiledCopy(
 #pragma unroll
       for (int j=0;j < TILEDIM;j += TILEROWS) {
         int pos  = pos0  + j*cuDimMk;
-        int n = __popc(__ballot((x < tiledVol.x) && (y + j < tiledVol.y)));
+        int n = __popcll((unsigned long long int)__ballot((x < tiledVol.x) && (y + j < tiledVol.y)));
         memStat.gld_tran += countGlTransactions(pos, n, accWidth, warpLane);
         memStat.gld_req += __any(n > 0);
       }
@@ -634,7 +634,7 @@ countTiledCopy(
 #pragma unroll
       for (int j=0;j < TILEDIM;j += TILEROWS) {
         int pos = pos0 + j*cuDimMm;
-        int n = __popc(__ballot((x < tiledVol.x) && (y + j < tiledVol.y)));
+        int n = __popcll((unsigned long long int)__ballot((x < tiledVol.x) && (y + j < tiledVol.y)));
         memStat.gst_tran += countGlTransactions(pos, n, accWidth, warpLane);
         memStat.gst_req += __any(n > 0);
         countCacheLines(pos, n, cacheWidth, warpLane, memStat.cl_full_l2, memStat.cl_part_l2);

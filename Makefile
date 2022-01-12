@@ -26,8 +26,8 @@
 #################### User Settings ####################
 
 # C++ compiler
-HOST_CC = g++
-GPU_CC = g++
+HOST_CC = hipcc
+GPU_CC = hipcc
 
 # CUDA compiler
 CUDAC = hipcc

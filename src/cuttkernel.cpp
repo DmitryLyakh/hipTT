@@ -65,8 +65,8 @@ __global__ void transposeTiled(
   const int xout = bx + threadIdx.y;
   const int yout = by + threadIdx.x;
 
-  const unsigned int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
-  const unsigned int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
+  const unsigned long long int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
+  const unsigned long long int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
 
   const int posMinorIn = xin + yin*cuDimMk;
   const int posMinorOut = yout + xout*cuDimMm;
@@ -80,7 +80,7 @@ __global__ void transposeTiled(
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -187,13 +187,13 @@ __global__ void transposePacked(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -313,13 +313,13 @@ __global__ void transposePackedSplit(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -378,7 +378,7 @@ __global__ void transposeTiledCopy(
   const int x = bx + threadIdx.x;
   const int y = by + threadIdx.y;
 
-  const unsigned int mask = __ballot((y + warpLane < tiledVol.y))*(x < tiledVol.x);
+  const unsigned long long int mask = __ballot((y + warpLane < tiledVol.y))*(x < tiledVol.x);
 
   const int posMinorIn = x + y*cuDimMk;
   const int posMinorOut = x + y*cuDimMm;
@@ -392,7 +392,7 @@ __global__ void transposeTiledCopy(
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=32;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -550,7 +550,7 @@ void cuttKernelSetSharedMemConfig() {
 // Caches for PackedSplit kernels. One cache for all devices
 // NOTE: Not thread safe
 const int CACHE_SIZE = 100000;
-const int MAX_NUMWARP = (1024/32);
+const int MAX_NUMWARP = (1024/64);
 const int MAX_NUMTYPE = 2;
 static int numDevices = -1;
 LRUCache<unsigned long long int, int> nabCache(CACHE_SIZE, -1);
