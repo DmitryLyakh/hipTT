@@ -27,6 +27,7 @@ SOFTWARE.
 #include "CudaUtils.h"
 #include "CudaMem.h"
 #include "cuttGpuModelKernel.h"
+#include <iostream>
 
 #define RESTRICT //__restrict__
 
@@ -216,7 +217,7 @@ __global__ void runCountersKernel(const int* posData, const int numPosData,
 //
 __device__ __forceinline__
 void writeMemStat(const int warpLane, MemStat memStat, MemStat* RESTRICT glMemStat) {
-  for (int i=32;i >= 1;i/=2) {
+  for (int i=warpSize/2;i >= 1;i/=2) {
     // memStat.gld_tran += __shfl_xor(memStat.gld_tran,i);
     // memStat.gst_tran += __shfl_xor(memStat.gst_tran,i);
     // memStat.gld_req  += __shfl_xor(memStat.gld_req,i);
@@ -292,7 +293,7 @@ countTiled(
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=32;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -302,7 +303,7 @@ countTiled(
     // Read data into shared memory tile
 #pragma unroll
     for (int j=0;j < TILEDIM;j += TILEROWS) {
-      int n = __popc((unsigned long long int)__ballot(maskIny & (1 << j)));
+      int n = __popcll((unsigned long long int)__ballot(maskIny & (1 << j)));
       memStat.gld_tran += countGlTransactions(posIn, n, accWidth, warpLane);
       memStat.gld_req += __any(n > 0);
       posIn += posInAdd;
@@ -387,13 +388,13 @@ countPacked(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=32;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=32;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -521,13 +522,13 @@ countPackedSplit(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=32;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=32;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -724,7 +725,6 @@ bool cuttGpuModelKernel(cuttPlan_t& plan, const int accWidth, const int cacheWid
 
     case PackedSplit:
     {
-
       // Calculate max. volume of split Mmk
       const int volSplit = (ts.splitDim/ts.numSplit) + ((ts.splitDim % ts.numSplit) != 0);
       const int volMmkSplit = volSplit*ts.volMmkUnsplit;

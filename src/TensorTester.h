@@ -33,7 +33,7 @@ SOFTWARE.
 struct TensorError_t {
   int refVal;
   int dataVal;
-  unsigned int pos;
+  unsigned long long int pos;
 };
 
 class TensorTester {

@@ -30,7 +30,7 @@ SOFTWARE.
 #include <hip/hip_runtime.h>
 #include "cuttTypes.h"
 
-const int TILEDIM = 32;
+const int TILEDIM = 64;
 const int TILEROWS = 8;
 
 // Transposing methods
