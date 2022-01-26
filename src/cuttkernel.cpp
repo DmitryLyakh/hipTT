@@ -22,11 +22,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Modifications Copyright (c) 2022 Advanced Micro Devices, Inc.
+All rights reserved.
 *******************************************************************************/
 #include <hip/hip_runtime.h>
 #include "CudaUtils.h"
 #include "LRUCache.h"
 #include "cuttkernel.h"
+#include <iostream>
 
 #define RESTRICT __restrict__
 
@@ -47,6 +51,7 @@ __global__ void transposeTiled(
   __shared__ T shTile[TILEDIM][TILEDIM+1];
 
   const int warpLane = threadIdx.x & (warpSize - 1);
+  
   TensorConvInOut Mbar;
   Mbar.c_in = 1;
   Mbar.d_in = 1;
@@ -65,8 +70,10 @@ __global__ void transposeTiled(
   const int xout = bx + threadIdx.y;
   const int yout = by + threadIdx.x;
 
-  const unsigned int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
-  const unsigned int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
+  const unsigned long long int maskIny = __ballot((yin + warpLane < tiledVol.y))*(xin < tiledVol.x);
+  const unsigned long long int maskOutx = __ballot((xout + warpLane < tiledVol.x))*(yout < tiledVol.y);
+
+  const unsigned long long int one = 1;
 
   const int posMinorIn = xin + yin*cuDimMk;
   const int posMinorOut = yout + xout*cuDimMm;
@@ -75,12 +82,11 @@ __global__ void transposeTiled(
 
   for (int posMbar=blockIdx.z;posMbar < volMbar;posMbar += gridDim.z)
   {
-
     // Compute global memory positions
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -95,7 +101,7 @@ __global__ void transposeTiled(
     for (int j=0;j < TILEDIM;j += TILEROWS) {
       // int pos = posIn + j*cuDimMk;
       // if (xin < readVol.x && yin + j < readVol.y) {
-      if ((maskIny & (1 << j)) != 0) {
+      if ((maskIny & (one << j)) != 0) {
         shTile[threadIdx.y + j][threadIdx.x] = dataIn[posIn];
       }
       posIn += posInAdd;
@@ -108,7 +114,7 @@ __global__ void transposeTiled(
     for (int j=0;j < TILEDIM;j += TILEROWS) {
       // int pos = posOut + j*cuDimMm;
       // if (xout + j < readVol.x && yout < readVol.y) {
-      if ((maskOutx & (1 << j)) != 0 ) {
+      if ((maskOutx & (one << j)) != 0 ) {
         dataOut[posOut] = shTile[threadIdx.x][threadIdx.y + j];
       }
       posOut += posOutAdd;
@@ -187,13 +193,13 @@ __global__ void transposePacked(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -313,13 +319,13 @@ __global__ void transposePackedSplit(
 
     int posMbarOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarOut += __shfl_xor(posMbarOut,i);
     }
 
     int posMbarIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMbarIn += __shfl_xor(posMbarIn,i);
     }
 
@@ -378,7 +384,9 @@ __global__ void transposeTiledCopy(
   const int x = bx + threadIdx.x;
   const int y = by + threadIdx.y;
 
-  const unsigned int mask = __ballot((y + warpLane < tiledVol.y))*(x < tiledVol.x);
+  const unsigned long long int mask = __ballot((y + warpLane < tiledVol.y))*(x < tiledVol.x);
+
+  const unsigned long long int one = 1;
 
   const int posMinorIn = x + y*cuDimMk;
   const int posMinorOut = x + y*cuDimMm;
@@ -387,12 +395,11 @@ __global__ void transposeTiledCopy(
 
   for (int posMbar=blockIdx.z;posMbar < volMbar;posMbar += gridDim.z)
   {
-
     // Compute global memory positions
     int posMajorIn = ((posMbar/Mbar.c_in) % Mbar.d_in)*Mbar.ct_in;
     int posMajorOut = ((posMbar/Mbar.c_out) % Mbar.d_out)*Mbar.ct_out;
 #pragma unroll
-    for (int i=16;i >= 1;i/=2) {
+    for (int i=warpSize/2;i >= 1;i/=2) {
       posMajorIn += __shfl_xor(posMajorIn,i);
       posMajorOut += __shfl_xor(posMajorOut,i);
     }
@@ -406,7 +413,7 @@ __global__ void transposeTiledCopy(
 #pragma unroll
     for (int j=0;j < TILEDIM;j += TILEROWS) {
       // if ((x < tiledVol.x) && (y + j < tiledVol.y)) {
-      if ((mask & (1 << j)) != 0) {
+      if ((mask & (one << j)) != 0) {
         val[j/TILEROWS] = dataIn[posIn];
       }
       posIn += posInAdd;
@@ -416,7 +423,7 @@ __global__ void transposeTiledCopy(
 #pragma unroll
     for (int j=0;j < TILEDIM;j += TILEROWS) {
       // if ((x < tiledVol.x) && (y + j < tiledVol.y)) {
-      if ((mask & (1 << j)) != 0) {
+      if ((mask & (one << j)) != 0) {
         dataOut[posOut] = val[j/TILEROWS];
       }
       posOut += posOutAdd;
@@ -550,7 +557,7 @@ void cuttKernelSetSharedMemConfig() {
 // Caches for PackedSplit kernels. One cache for all devices
 // NOTE: Not thread safe
 const int CACHE_SIZE = 100000;
-const int MAX_NUMWARP = (1024/32);
+const int MAX_NUMWARP = (1024/64);
 const int MAX_NUMTYPE = 2;
 static int numDevices = -1;
 LRUCache<unsigned long long int, int> nabCache(CACHE_SIZE, -1);
@@ -843,6 +850,9 @@ bool cuttKernel(cuttPlan_t& plan, void* dataIn, void* dataOut) {
   LaunchConfig& lc = plan.launchConfig;
   TensorSplit& ts = plan.tensorSplit;
 
+  // if(ts.method == Tiled)
+  //   ts.method = PackedSplit;
+
   switch(ts.method) {
     case Trivial:
     {
@@ -892,9 +902,9 @@ bool cuttKernel(cuttPlan_t& plan, void* dataIn, void* dataOut) {
     case Tiled:
     {
 #define CALL(TYPE) \
-      transposeTiled<TYPE> <<< lc.numblock, lc.numthread, 0, plan.stream >>> \
-      (((ts.volMm - 1)/TILEDIM + 1), ts.volMbar, ts.sizeMbar, plan.tiledVol, plan.cuDimMk, plan.cuDimMm, \
-        plan.Mbar, (TYPE *)dataIn, (TYPE *)dataOut)
+       transposeTiled<TYPE> <<< lc.numblock, lc.numthread, 0, plan.stream >>> \
+       (((ts.volMm - 1)/TILEDIM + 1), ts.volMbar, ts.sizeMbar, plan.tiledVol, plan.cuDimMk, plan.cuDimMm, \
+         plan.Mbar, (TYPE *)dataIn, (TYPE *)dataOut)
       if (plan.sizeofType == 4) CALL(float);
       if (plan.sizeofType == 8) CALL(double);
 #undef CALL

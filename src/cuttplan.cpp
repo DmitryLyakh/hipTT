@@ -1069,7 +1069,7 @@ bool cuttPlan_t::countCycles(hipDeviceProp_t& prop, const int numPosMbarSample) 
   // 128 bytes per transaction
   const int accWidth = 128/sizeofType;
   // L2 cache line width is 32 bytes
-  const int cacheWidth = 32/sizeofType;
+  const int cacheWidth = 64/sizeofType;
 
   if (tensorSplit.method == Tiled) {
     // Global memory

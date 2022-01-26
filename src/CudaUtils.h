@@ -29,6 +29,8 @@ SOFTWARE.
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime.h>
 
+static int warp_size = 64;
+
 //
 // Error checking wrapper for CUDA
 //
