@@ -53,7 +53,7 @@ cuttTimer* timerDouble;
 
 long long int* dataIn  = NULL;
 long long int* dataOut = NULL;
-int dataSize  = 20000000;
+int dataSize  = 200000000;
 TensorTester* tester = NULL;
 
 bool test1();
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   if(passed){passed = test1(); if(!passed) printf("Test 1 failed\n");}
   if(passed){passed = test2(); if(!passed) printf("Test 2 failed\n");}
   if(passed){passed = test3(); if(!passed) printf("Test 3 failed\n");}
-  //if(passed){passed = test4(); if(!passed) printf("Test 4 failed\n");}
+  if(passed){passed = test4(); if(!passed) printf("Test 4 failed\n");}
   //if(passed){passed = test5(); if(!passed) printf("Test 5 failed\n");}
 
   if(passed){
@@ -267,9 +267,9 @@ bool test3() {
     int rank = 3;
     std::vector<int> dim(rank);
     std::vector<int> permutation(rank);
-    dim[0] = 651;
-    dim[1] = 299;
-    dim[2] = 44;
+    dim[0] = 1305;
+    dim[1] = 599;
+    dim[2] = 88;
     permutation[0] = 0;
     permutation[1] = 2;
     permutation[2] = 1;
@@ -282,9 +282,9 @@ bool test3() {
     std::vector<int> dim(rank);
     std::vector<int> permutation(rank);
     dim[0] = 24;
-    dim[1] = 170;
-    dim[2] = 32;
-    dim[3] = 97;
+    dim[1] = 330;
+    dim[2] = 64;
+    dim[3] = 147;
     permutation[0] = 1;
     permutation[1] = 0;
     permutation[2] = 2;
@@ -333,10 +333,10 @@ bool test3() {
     std::vector<int> dim(5);
     std::vector<int> permutation(5);
     dim[0] = 5;
-    dim[1] = 32;
-    dim[2] = 45;
-    dim[3] = 63;
-    dim[4] = 37;
+    dim[1] = 42;
+    dim[2] = 75;
+    dim[3] = 86;
+    dim[4] = 57;
     permutation[0] = 2 - 1;
     permutation[1] = 4 - 1;
     permutation[2] = 5 - 1;
